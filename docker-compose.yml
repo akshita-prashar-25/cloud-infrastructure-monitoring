@@ -1,0 +1,57 @@
+services:
+
+  mysql:
+    image: mysql:8.0
+    container_name: monitoring-mysql
+    environment:
+      MYSQL_DATABASE: monitoring_system
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "mysqladmin",
+          "ping",
+          "-h",
+          "localhost",
+          "-u",
+          "root",
+          "-p${MYSQL_ROOT_PASSWORD}"
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    image: monitoring-backend:latest
+    container_name: monitoring-backend
+    depends_on:
+      mysql:
+        condition: service_healthy
+    ports:
+      - "8081:8080"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/api/servers"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/monitoring_system
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+
+  agent:
+    image: monitoring-agent:latest
+    container_name: monitoring-agent
+    depends_on:
+      backend:
+        condition: service_healthy
+    environment:
+      BACKEND_URL: http://backend:8080
+
+volumes:
+  mysql-data:
