@@ -16,7 +16,7 @@ public class WebConfig implements WebMvcConfigurer {
             CorsRegistry registry) {
 
         registry.addMapping("/api/**")
-                .allowedOrigins(frontendUrl)
+                .allowedOrigins(frontendUrl.split(","))
                 .allowedMethods(
                         "GET",
                         "POST",
