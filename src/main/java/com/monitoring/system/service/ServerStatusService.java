@@ -151,8 +151,7 @@ public class ServerStatusService {
         ) {
 
             resolveAgentOfflineAlert(
-                    server.getId(),
-                    agent.getId()
+                    server.getId()
             );
 
             return;
@@ -185,10 +184,8 @@ public class ServerStatusService {
         if (secondsSinceLastSeen <= 30) {
 
             resolveAgentOfflineAlert(
-                    server.getId(),
-                    agent.getId()
+                    server.getId()
             );
-
         }
 
         // =========================
@@ -214,9 +211,8 @@ public class ServerStatusService {
 
         boolean alertExists =
                 alertRepository
-                        .existsByServerIdAndAgentIdAndTypeAndStatus(
+                        .existsByServerIdAndTypeAndStatus(
                                 server.getId(),
-                                agent.getId(),
                                 "AGENT",
                                 "ACTIVE"
                         );
@@ -264,14 +260,12 @@ public class ServerStatusService {
     // =========================
 
     private void resolveAgentOfflineAlert(
-            Long serverId,
-            Long agentId) {
+            Long serverId) {
 
         List<Alert> activeAlerts =
                 alertRepository
-                        .findByServerIdAndAgentIdAndTypeAndStatus(
+                        .findByServerIdAndTypeAndStatus(
                                 serverId,
-                                agentId,
                                 "AGENT",
                                 "ACTIVE"
                         );
