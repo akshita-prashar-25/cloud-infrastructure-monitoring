@@ -121,82 +121,66 @@ public class ServerStatusService {
             return;
         }
 
+        boolean anyAgentOnline = false;
+
+        Agent offlineAgent = null;
+
         for (Agent agent : agents) {
 
-            checkIndividualAgentHealth(
-                    server,
-                    agent,
-                    currentTime
-            );
+            // Keep one agent reference.
+            // This will be used if all agents
+            // are offline and an alert needs
+            // to be created.
+            if (offlineAgent == null) {
+                offlineAgent = agent;
+            }
+
+            // Ignore agents that are not ACTIVE.
+            if (!"ACTIVE".equals(agent.getStatus())) {
+                continue;
+            }
+
+            // Agent has never sent a heartbeat.
+            if (agent.getLastSeen() == null) {
+                continue;
+            }
+
+            long secondsSinceLastSeen =
+                    Duration.between(
+                            agent.getLastSeen(),
+                            currentTime
+                    ).getSeconds();
+
+            // At least one agent is online.
+            if (secondsSinceLastSeen <= 30) {
+
+                anyAgentOnline = true;
+
+                break;
+            }
         }
-    }
-
-    // =========================
-    // CHECK INDIVIDUAL AGENT
-    // =========================
-
-    private void checkIndividualAgentHealth(
-            Server server,
-            Agent agent,
-            LocalDateTime currentTime) {
 
         // =========================
-        // INACTIVE AGENT
+        // AT LEAST ONE AGENT ONLINE
         // =========================
 
-        if (
-                !"ACTIVE".equals(
-                        agent.getStatus()
-                )
-        ) {
+        if (anyAgentOnline) {
 
             resolveAgentOfflineAlert(
                     server.getId()
             );
 
-            return;
         }
 
         // =========================
-        // NO LAST SEEN
-        // =========================
-
-        if (agent.getLastSeen() == null) {
-
-            createAgentOfflineAlert(
-                    server,
-                    agent
-            );
-
-            return;
-        }
-
-        long secondsSinceLastSeen =
-                Duration.between(
-                        agent.getLastSeen(),
-                        currentTime
-                ).getSeconds();
-
-        // =========================
-        // AGENT ONLINE
-        // =========================
-
-        if (secondsSinceLastSeen <= 30) {
-
-            resolveAgentOfflineAlert(
-                    server.getId()
-            );
-        }
-
-        // =========================
-        // AGENT OFFLINE
+        // ALL AGENTS OFFLINE
         // =========================
 
         else {
 
             createAgentOfflineAlert(
                     server,
-                    agent
+                    offlineAgent
             );
         }
     }
@@ -217,10 +201,8 @@ public class ServerStatusService {
                                 "ACTIVE"
                         );
 
-        // =========================
-        // PREVENT DUPLICATE ALERTS
-        // =========================
-
+        // Prevent duplicate active
+        // AGENT alerts for the same server.
         if (alertExists) {
             return;
         }
@@ -232,9 +214,14 @@ public class ServerStatusService {
                 server.getId()
         );
 
-        alert.setAgentId(
-                agent.getId()
-        );
+        // Store the agent that was offline
+        // when the alert was created.
+        if (agent != null) {
+
+            alert.setAgentId(
+                    agent.getId()
+            );
+        }
 
         alert.setType(
                 "AGENT"
@@ -252,7 +239,9 @@ public class ServerStatusService {
                 "ACTIVE"
         );
 
-        alertRepository.save(alert);
+        alertRepository.save(
+                alert
+        );
     }
 
     // =========================
@@ -276,7 +265,9 @@ public class ServerStatusService {
                     "RESOLVED"
             );
 
-            alertRepository.save(alert);
+            alertRepository.save(
+                    alert
+            );
         }
     }
 }
