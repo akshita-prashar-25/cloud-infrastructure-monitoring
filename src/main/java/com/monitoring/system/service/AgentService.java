@@ -1,5 +1,7 @@
 package com.monitoring.system.service;
 
+import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -7,59 +9,73 @@ import org.springframework.stereotype.Service;
 
 import com.monitoring.system.entity.Agent;
 import com.monitoring.system.entity.Server;
+import com.monitoring.system.exception.ResourceNotFoundException;
 import com.monitoring.system.repository.AgentRepository;
 import com.monitoring.system.repository.ServerRepository;
-import com.monitoring.system.exception.ResourceNotFoundException;
 
 @Service
 public class AgentService {
 
     private final AgentRepository agentRepository;
-
     private final ServerRepository serverRepository;
-
 
     public AgentService(
             AgentRepository agentRepository,
             ServerRepository serverRepository) {
 
-        this.agentRepository =
-                agentRepository;
-
-        this.serverRepository =
-                serverRepository;
+        this.agentRepository = agentRepository;
+        this.serverRepository = serverRepository;
     }
-
 
     // =========================
     // REGISTER AGENT
     // =========================
 
-    public Agent registerAgent(
-            Agent agent) {
-
-        Server server;
-
+    public Agent registerAgent(Agent agent) {
 
         // =========================
-        // CHECK SERVER ID
+        // CHECK EXISTING AGENT
         // =========================
 
+        Agent existingAgent =
+                agentRepository
+                        .findFirstByHostnameAndIpAddressOrderByIdAsc(
+                                agent.getHostname(),
+                                agent.getIpAddress()
+                        )
+                        .orElse(null);
+
+        // =========================
+        // REUSE EXISTING AGENT
+        // =========================
+
+        if (existingAgent != null) {
+
+            existingAgent.setStatus("ACTIVE");
+
+            existingAgent.setLastSeen(
+                    LocalDateTime.now()
+            );
+
+            return agentRepository.save(
+                    existingAgent
+            );
+        }
+
+        // =========================
+        // FIND SERVER
+        // =========================
+
+        Server server = null;
+
+        // First try server ID if one was provided
         if (agent.getServerId() != null) {
 
             server =
                     serverRepository
-                            .findById(
-                                    agent.getServerId()
-                            )
+                            .findById(agent.getServerId())
                             .orElse(null);
-
-        } else {
-
-            server = null;
-
         }
-
 
         // =========================
         // FIND SERVER BY IP
@@ -73,9 +89,7 @@ public class AgentService {
                                     agent.getIpAddress()
                             )
                             .orElse(null);
-
         }
-
 
         // =========================
         // CREATE NEW SERVER
@@ -103,49 +117,30 @@ public class AgentService {
                     );
         }
 
-
         // =========================
-        // ASSIGN SERVER ID
+        // CREATE NEW AGENT
         // =========================
 
         agent.setServerId(
                 server.getId()
         );
 
-
-        // =========================
-        // GENERATE API KEY
-        // =========================
-
-        String apiKey =
-                UUID.randomUUID()
-                        .toString();
-
         agent.setApiKey(
-                apiKey
+                UUID.randomUUID().toString()
         );
-
-
-        // =========================
-        // SET STATUS
-        // =========================
 
         agent.setStatus(
                 "ACTIVE"
         );
 
-
-        // =========================
-        // SAVE AGENT
-        // =========================
+        agent.setLastSeen(
+                LocalDateTime.now()
+        );
 
         return agentRepository.save(
                 agent
         );
-
     }
-
-
     // =========================
     // GET ALL AGENTS
     // =========================
@@ -153,9 +148,7 @@ public class AgentService {
     public List<Agent> getAllAgents() {
 
         return agentRepository.findAll();
-
     }
-
 
     // =========================
     // GET AGENT BY ID
@@ -168,13 +161,11 @@ public class AgentService {
                 .orElseThrow(() ->
                         new ResourceNotFoundException(
                                 "Agent with ID "
-                                + id
-                                + " not found"
+                                        + id
+                                        + " not found"
                         )
                 );
     }
-
-
 
     // =========================
     // GET AGENT BY API KEY
@@ -186,9 +177,7 @@ public class AgentService {
         return agentRepository
                 .findByApiKey(apiKey)
                 .orElse(null);
-
     }
-
 
     // =========================
     // VALIDATE API KEY
@@ -203,31 +192,22 @@ public class AgentService {
         ) {
 
             return false;
-
         }
-
 
         Agent agent =
                 agentRepository
-                        .findByApiKey(
-                                apiKey
-                        )
+                        .findByApiKey(apiKey)
                         .orElse(null);
-
 
         if (agent == null) {
 
             return false;
-
         }
-
 
         return "ACTIVE".equals(
                 agent.getStatus()
         );
-
     }
-
 
     // =========================
     // UPDATE AGENT STATUS
@@ -242,79 +222,73 @@ public class AgentService {
                         .findById(id)
                         .orElse(null);
 
-
         if (agent == null) {
 
             return null;
-
         }
-
 
         agent.setStatus(
                 status
         );
 
+        return agentRepository.save(
+                agent
+        );
+    }
+
+    // =========================
+    // UPDATE LAST SEEN
+    // =========================
+
+    public Agent updateLastSeen(
+            Long agentId) {
+
+        Agent agent =
+                agentRepository
+                        .findById(agentId)
+                        .orElse(null);
+
+        if (agent == null) {
+
+            return null;
+        }
+
+        agent.setLastSeen(
+                LocalDateTime.now()
+        );
 
         return agentRepository.save(
                 agent
         );
-
     }
-    
- // =========================
- // UPDATE LAST SEEN
- // =========================
 
- public Agent updateLastSeen(
-         Long agentId) {
+    // =========================
+    // CHECK AGENT CONNECTION
+    // =========================
 
-     Agent agent =
-             agentRepository
-                     .findById(agentId)
-                     .orElse(null);
+    public String getConnectionStatus(
+            Agent agent) {
 
-     if (agent == null) {
+        if (agent == null) {
+            return "OFFLINE";
+        }
 
-         return null;
-     }
+        if (agent.getLastSeen() == null) {
+            return "OFFLINE";
+        }
 
-     agent.setLastSeen(
-             java.time.LocalDateTime.now()
-     );
+        long secondsSinceLastSeen =
+                Duration.between(
+                        agent.getLastSeen(),
+                        LocalDateTime.now()
+                ).getSeconds();
 
-     return agentRepository.save(
-             agent
-     );
- }
- 
-//=========================
-//CHECK AGENT CONNECTION
-//=========================
+        if (secondsSinceLastSeen <= 30) {
+            return "ONLINE";
+        }
 
-public String getConnectionStatus(
-      Agent agent) {
-
-  if (agent == null) {
-      return "OFFLINE";
-  }
-
-  if (agent.getLastSeen() == null) {
-      return "OFFLINE";
-  }
-
-  long secondsSinceLastSeen =
-          java.time.Duration.between(
-                  agent.getLastSeen(),
-                  java.time.LocalDateTime.now()
-          ).getSeconds();
-
-  if (secondsSinceLastSeen <= 30) {
-      return "ONLINE";
-  }
-
-  return "OFFLINE";
-}
-
+        return "OFFLINE";
+    }
 
     // =========================
     // DELETE AGENT
@@ -326,7 +300,5 @@ public String getConnectionStatus(
         agentRepository.deleteById(
                 id
         );
-
     }
-
 }
