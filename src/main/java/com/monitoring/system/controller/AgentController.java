@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.ArrayList;
 
 import com.monitoring.system.dto.AgentResponse;
+import com.monitoring.system.dto.AgentRegistrationResponse;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -42,14 +43,22 @@ public class AgentController {
     // =========================
 
     @PostMapping("/register")
-    public Agent registerAgent(
-           @Valid  @RequestBody Agent agent) {
+    public AgentRegistrationResponse registerAgent(
+            @Valid @RequestBody Agent agent) {
 
-        return agentService
-                .registerAgent(agent);
+        Agent registeredAgent =
+                agentService.registerAgent(agent);
 
+        AgentRegistrationResponse response =
+                new AgentRegistrationResponse();
+
+        response.setId(registeredAgent.getId());
+        response.setServerId(registeredAgent.getServerId());
+        response.setApiKey(registeredAgent.getApiKey());
+        response.setStatus(registeredAgent.getStatus());
+
+        return response;
     }
-
 
     // =========================
     // GET ALL AGENTS
@@ -120,12 +129,24 @@ public class AgentController {
     // =========================
 
     @GetMapping("/{id}")
-    public Agent getAgentById(
-            @PathVariable Long id) {
+    public AgentResponse getAgentById(@PathVariable Long id) {
 
-        return agentService
-                .getAgentById(id);
+        Agent agent = agentService.getAgentById(id);
 
+        AgentResponse response = new AgentResponse();
+        response.setId(agent.getId());
+        response.setServerId(agent.getServerId());
+        response.setAgentName(agent.getAgentName());
+        response.setHostname(agent.getHostname());
+        response.setIpAddress(agent.getIpAddress());
+        response.setStatus(agent.getStatus());
+        response.setConnectionStatus(
+                agentService.getConnectionStatus(agent)
+        );
+        response.setRegisteredAt(agent.getRegisteredAt());
+        response.setLastSeen(agent.getLastSeen());
+
+        return response;
     }
 
 
@@ -167,30 +188,27 @@ public class AgentController {
         }
 
 
-        Agent updatedAgent =
-                agentService
-                        .updateAgentStatus(
-                                id,
-                                status
-                        );
-
+        Agent updatedAgent = agentService.updateAgentStatus(id, status);
 
         if (updatedAgent == null) {
-
-            return ResponseEntity
-                    .status(
-                            HttpStatus.NOT_FOUND
-                    )
-                    .body(
-                            "Agent not found"
-                    );
-
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body("Agent not found");
         }
 
-
-        return ResponseEntity.ok(
-                updatedAgent
+        AgentResponse response = new AgentResponse();
+        response.setId(updatedAgent.getId());
+        response.setServerId(updatedAgent.getServerId());
+        response.setAgentName(updatedAgent.getAgentName());
+        response.setHostname(updatedAgent.getHostname());
+        response.setIpAddress(updatedAgent.getIpAddress());
+        response.setStatus(updatedAgent.getStatus());
+        response.setConnectionStatus(
+                agentService.getConnectionStatus(updatedAgent)
         );
+        response.setRegisteredAt(updatedAgent.getRegisteredAt());
+        response.setLastSeen(updatedAgent.getLastSeen());
+
+        return ResponseEntity.ok(response);
 
     }
 

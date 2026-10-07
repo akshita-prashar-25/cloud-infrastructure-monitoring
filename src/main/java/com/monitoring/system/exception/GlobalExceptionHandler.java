@@ -1,5 +1,8 @@
 package com.monitoring.system.exception;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -13,6 +16,11 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+	
+	private static final Logger logger =
+	        LoggerFactory.getLogger(
+	                GlobalExceptionHandler.class
+	        );
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<?> handleValidationException(
@@ -110,6 +118,11 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(Exception.class)
     public ResponseEntity<?> handleGeneralException(
             Exception exception) {
+
+        logger.error(
+                "Unexpected backend error while processing request",
+                exception
+        );
 
         Map<String, Object> response =
                 new LinkedHashMap<>();
